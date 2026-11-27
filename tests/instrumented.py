@@ -440,6 +440,21 @@ class TestInteractive(metaclass=OrderedClassMembers):
         self.stockfish.send_command("go depth 5")
         self.stockfish.starts_with("bestmove")
 
+    def test_multipv_duplicate_searchmoves(self):
+        self.stockfish.setoption("MultiPV", "3")
+        self.stockfish.send_command("position startpos")
+        self.stockfish.send_command("go depth 5 searchmoves e2e4 d2d4 e2e4")
+        self.stockfish.starts_with("bestmove")
+        ranks = set()
+        moves = set()
+        for line in self.stockfish.get_output():
+            if " multipv " in line:
+                ranks.add(line.split(" multipv ")[1].split()[0])
+                moves.add(line.split(" pv ")[1].split()[0])
+        assert ranks == {"1", "2"}
+        assert moves == {"e2e4", "d2d4"}
+        self.stockfish.setoption("MultiPV", "1")
+
     def test_multipv_setting(self):
         self.stockfish.send_command("setoption name MultiPV value 4")
         self.stockfish.send_command("position startpos")

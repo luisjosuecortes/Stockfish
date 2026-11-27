@@ -306,7 +306,8 @@ void ThreadPool::start_thinking(const OptionsMap&  options,
     {
         auto move = UCIEngine::to_move(pos, uciMove);
 
-        if (move != Move::none())
+        if (move != Move::none()
+            && std::find(rootMoves.begin(), rootMoves.end(), move) == rootMoves.end())
             rootMoves.emplace_back(move);
     }
 
