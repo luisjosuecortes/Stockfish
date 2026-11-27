@@ -151,6 +151,10 @@ endif
 
 ifeq ($(ARCH), native)
    override ARCH := $(shell "$(SHELL)" ../scripts/get_native_properties.sh | cut -d " " -f 1)
+   # Fishtest experiment only: compare the generic SSE2 build on x86-64 workers.
+   ifneq ($(filter x86-64%,$(ARCH)),)
+      override ARCH := x86-64
+   endif
 endif
 
 # explicitly check for the list of supported architectures (as listed with make help),
