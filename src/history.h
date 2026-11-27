@@ -226,15 +226,15 @@ struct SharedHistories {
     auto& pawn_correction_entry(const Position& pos) {
         return correctionHistory[pos.pawn_key() & sizeMinus1];
     }
-    const auto& pawn_correction_entry(const Position& pos) const {
-        return correctionHistory[pos.pawn_key() & sizeMinus1];
+    const auto& pawn_correction_entry(const Position& pos, bool opposite = false) const {
+        return correctionHistory[(pos.pawn_key() ^ Key(opposite)) & sizeMinus1];
     }
 
     auto& minor_piece_correction_entry(const Position& pos) {
         return correctionHistory[pos.minor_piece_key() & sizeMinus1];
     }
-    const auto& minor_piece_correction_entry(const Position& pos) const {
-        return correctionHistory[pos.minor_piece_key() & sizeMinus1];
+    const auto& minor_piece_correction_entry(const Position& pos, bool opposite = false) const {
+        return correctionHistory[(pos.minor_piece_key() ^ Key(opposite)) & sizeMinus1];
     }
 
     template<Color c>
@@ -242,8 +242,8 @@ struct SharedHistories {
         return correctionHistory[pos.non_pawn_key(c) & sizeMinus1];
     }
     template<Color c>
-    const auto& nonpawn_correction_entry(const Position& pos) const {
-        return correctionHistory[pos.non_pawn_key(c) & sizeMinus1];
+    const auto& nonpawn_correction_entry(const Position& pos, bool opposite = false) const {
+        return correctionHistory[(pos.non_pawn_key(c) ^ Key(opposite)) & sizeMinus1];
     }
 
     UnifiedCorrectionHistory               correctionHistory;

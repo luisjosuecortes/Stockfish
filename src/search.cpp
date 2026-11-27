@@ -95,7 +95,8 @@ const std::array<int, MAX_MOVES> reductions = [] {
 int correction_value(const Worker& w, const Position& pos, const Stack* const ss) {
     const auto  m      = (ss - 1)->currentMove;
     const auto& shared = w.sharedHistory;
-    const int   pcv    = shared.pawn_correction_entry(pos).pawn[bool(pos.pieces(QUEEN))];
+    const bool  queens = bool(pos.pieces(QUEEN));
+    const int   pcv    = shared.pawn_correction_entry(pos).pawn[queens];
     const int   micv   = shared.minor_piece_correction_entry(pos).minor;
     const int   wnpcv  = shared.nonpawn_correction_entry<WHITE>(pos).nonPawnWhite;
     const int   bnpcv  = shared.nonpawn_correction_entry<BLACK>(pos).nonPawnBlack;
@@ -108,6 +109,19 @@ int correction_value(const Worker& w, const Position& pos, const Stack* const ss
           : 80695;
 
     return 13806 * pcv + 9512 * micv + 11615 * (wnpcv + bnpcv) + cntcv;
+}
+
+// The other turn predicts a signed evaluation error; pruning margins use our own history.
+int opposite_correction(const Worker& w, const Position& pos) {
+    const auto& shared = w.sharedHistory;
+    const bool queens = bool(pos.pieces(QUEEN));
+    // Structural evaluation errors also carry information across the change of turn.
+    return
+      13806 * shared.pawn_correction_entry(pos, true).pawn[queens]
+      + 9512 * shared.minor_piece_correction_entry(pos, true).minor
+      + 11615 * (shared.nonpawn_correction_entry<WHITE>(pos, true).nonPawnWhite
+                 + shared.nonpawn_correction_entry<BLACK>(pos, true).nonPawnBlack);
+
 }
 
 // Add correctionHistory value to raw staticEval and guarantee evaluation
@@ -843,7 +857,7 @@ Value Search::Worker::search(
         if (!is_valid(unadjustedStaticEval))
             unadjustedStaticEval = evaluate(pos);
 
-        ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+        ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue - opposite_correction(*this, pos) / 4);
 
         // ttValue can be used as a better position evaluation
         if (is_valid(ttData.value)
@@ -853,7 +867,7 @@ Value Search::Worker::search(
     else
     {
         unadjustedStaticEval = evaluate(pos);
-        ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+        ss->staticEval = eval = to_corrected_static_eval(unadjustedStaticEval, correctionValue - opposite_correction(*this, pos) / 4);
 
         // Static evaluation is saved as it was before adjustment by correction history
         ttWriter.write(posKey, VALUE_NONE, ss->ttPv, BOUND_NONE, DEPTH_UNSEARCHED, Move::none(),
@@ -1743,7 +1757,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
                 unadjustedStaticEval = evaluate(pos);
 
             ss->staticEval = bestValue =
-              to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+              to_corrected_static_eval(unadjustedStaticEval, correctionValue - opposite_correction(*this, pos) / 4);
 
             // ttValue can be used as a better position evaluation
             if (is_valid(ttData.value) && !is_decisive(ttData.value)
@@ -1754,7 +1768,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         {
             unadjustedStaticEval = evaluate(pos);
             ss->staticEval       = bestValue =
-              to_corrected_static_eval(unadjustedStaticEval, correctionValue);
+              to_corrected_static_eval(unadjustedStaticEval, correctionValue - opposite_correction(*this, pos) / 4);
         }
 
         // Stand pat. Return immediately if static value is at least beta
