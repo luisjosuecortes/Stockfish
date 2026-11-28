@@ -1788,6 +1788,9 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
     MovePicker mp(pos, ttData.move, DEPTH_QS, &mainHistory, &lowPlyHistory, &captureHistory,
                   contHist, &sharedHistory, ss->ply);
 
+    // Discount captures pruned by SEE without changing the legal move count.
+    int seePrunedCaptures = 0;
+
     // Step 5. Loop through all legal moves until no moves remain
     // or a beta cutoff occurs.
     while ((move = mp.next_move()) != Move::none())
@@ -1802,10 +1805,13 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
         // Step 6. Pruning
         if (!is_loss(bestValue))
         {
+            const bool eligible = !ss->inCheck && capture && move.type_of() == NORMAL && !givesCheck
+                               && move.to_sq() != prevSq;
+
             // Futility pruning and moveCount pruning
             if (!givesCheck && move.to_sq() != prevSq && !is_loss(futilityBase))
             {
-                if (moveCount > 2)
+                if (moveCount - (eligible ? seePrunedCaptures : 0) > 2)
                     continue;
 
                 Value futilityValue = futilityBase + PieceValue[pos.piece_on(move.to_sq())];
@@ -1822,6 +1828,7 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
                 if (!pos.see_ge(move, alpha - futilityBase))
                 {
                     bestValue = std::max(bestValue, std::min(alpha, futilityBase));
+                    seePrunedCaptures += eligible;
                     continue;
                 }
             }
@@ -1832,7 +1839,10 @@ Value Search::Worker::qsearch(Position& pos, Stack* ss, Value alpha, Value beta)
 
             // Do not search moves with bad enough SEE values
             if (!pos.see_ge(move, -74))
+            {
+                seePrunedCaptures += eligible;
                 continue;
+            }
         }
 
         // Step 7. Make and search the move
