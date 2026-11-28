@@ -152,6 +152,7 @@ struct RootMove {
     }
 
     u64         effort           = 0;
+    u64         effortAtStart    = 0;
     Value       score            = -VALUE_INFINITE;
     Value       previousScore    = -VALUE_INFINITE;
     Value       averageScore     = -VALUE_INFINITE;

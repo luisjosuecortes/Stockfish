@@ -327,6 +327,10 @@ bool Search::Worker::iterative_deepening() {
 
     multiPV = std::min(multiPV, rootMoves.size());
 
+    // Keep eligibility fixed for searches started in ponder mode.
+    const bool useRecentEffort = mainThread && multiPV == 1 && !skill.enabled()
+                              && !limits.ponderMode && !limits.npmsec;
+
     int  searchAgainCounter = 0;
     int  failHighRecovery   = 0;
     u64  totalEffort        = 0;
@@ -344,6 +348,9 @@ bool Search::Worker::iterative_deepening() {
     {
         rootDepth++;
 
+        // Snapshot effort once per iteration, including all aspiration searches.
+        const u64 iterationStartNodes = useRecentEffort ? u64(nodes) : 0;
+
         // Do not tune these values. They are not intended for playing strength.
         int seekMateThreshold = 750 + 220000 / (rootDepth * rootDepth);
 
@@ -358,6 +365,9 @@ bool Search::Worker::iterative_deepening() {
             rootMoves[i].previousScore      = rootMoves[i].score;
             rootMoves[i].previousPV         = rootMoves[i].pv;
             rootMoves[i].previousScoreExact = i < multiPV;
+
+            if (useRecentEffort)
+                rootMoves[i].effortAtStart = rootMoves[i].effort;
         }
 
         usize pvFirst = pvLast = 0;
@@ -578,6 +588,13 @@ bool Search::Worker::iterative_deepening() {
         if (limits.use_time_management() && !threads.stop && !mainThread->stopOnPonderhit)
         {
             u64 nodesEffort = rootMoves[0].effort * 100000 / std::max(u64(1), totalEffort);
+
+            if (useRecentEffort && totalEffort > iterationStartNodes)
+            {
+                u64 recentNodesEffort = (rootMoves[0].effort - rootMoves[0].effortAtStart) * 100000
+                                      / (totalEffort - iterationStartNodes);
+                nodesEffort = (nodesEffort + recentNodesEffort) / 2;
+            }
 
             double fallingEval =
               (11.48 + 2.30 * (mainThread->bestPreviousAverageScore - rootMoves[0].score)
