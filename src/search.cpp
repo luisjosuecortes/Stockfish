@@ -884,17 +884,20 @@ Value Search::Worker::search(
         if ((ttData.bound & (ttData.value >= beta ? BOUND_LOWER : BOUND_UPPER))
             && (cutNode == (ttData.value >= beta) || depth > 4))
         {
-            // If the ttMove is quiet, update move sorting heuristics on TT hit
-            if (ttData.move && ttData.value >= beta)
-            {
-                // Bonus for a quiet ttMove that fails high
-                if (!ttCapture)
-                    update_quiet_histories(pos, ss, *this, ttData.move, 131 * depth);
+            auto tt_cutoff = [&]() -> Value {
+                // If the ttMove is quiet, update move sorting heuristics on TT hit
+                if (ttData.move && ttData.value >= beta)
+                {
+                    // Bonus for a quiet ttMove that fails high
+                    if (!ttCapture)
+                        update_quiet_histories(pos, ss, *this, ttData.move, 131 * depth);
 
-                // Extra penalty for early quiet moves of the previous ply
-                if (prevSq != SQ_NONE && (ss - 1)->moveCount < 5 && !priorCapture)
-                    update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq, -2210);
-            }
+                    // Extra penalty for early quiet moves of the previous ply
+                    if (prevSq != SQ_NONE && (ss - 1)->moveCount < 5 && !priorCapture)
+                        update_continuation_histories(ss - 1, pos.piece_on(prevSq), prevSq, -2210);
+                }
+                return ttData.value;
+            };
 
             // Partial workaround for the graph history interaction problem.
             // For high rule50 counts don't produce transposition table cutoffs.
@@ -910,13 +913,13 @@ Value Search::Worker::search(
 
                     // Check that the ttValue after the tt move would also trigger a cutoff
                     if (!is_valid(ttDataNext.value))
-                        return ttData.value;
+                        return tt_cutoff();
 
                     if ((ttData.value >= beta) == (-ttDataNext.value >= beta))
-                        return ttData.value;
+                        return tt_cutoff();
                 }
                 else
-                    return ttData.value;
+                    return tt_cutoff();
             }
         }
         // Case B: No cutoff, but depth was sufficient, so the bound points the wrong way.
