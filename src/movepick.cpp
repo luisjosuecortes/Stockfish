@@ -252,7 +252,10 @@ ExtMove* MovePicker::generate_and_score() {
                 value += 8 * (*lph)[m.raw()] / (1 + ply);
 
             // bonus for checks
-            if ((pos.check_squares(pt) & to) && pos.see_ge(m, -75))
+            if (((pos.check_squares(pt) & to)
+                 || (m.type_of() == NORMAL && (pos.blockers_for_king(~us) & from)
+                     && !(Attacks::line_bb(from, to) & pos.pieces(~us, KING))))
+                && pos.see_ge(m, -75))
                 value += 16384;
 
             m.value = value;
