@@ -53,12 +53,14 @@ class MovePicker {
     MovePicker(const Position&, Move, int, const CapturePieceToHistory*);
     Move next_move();
     void skip_quiet_moves();
+    void prefer(Move);
 
    private:
     template<typename Pred>
     Move select(Pred);
     template<GenType T>
     ExtMove* generate_and_score();
+    void promote_preferred();
 
     const Position&              pos;
     const ButterflyHistory*      mainHistory;
@@ -67,6 +69,7 @@ class MovePicker {
     const PieceToHistory**       continuationHistory;
     const SharedHistories*       sharedHistory;
     Move                         ttMove;
+    Move                         preferredMove = Move::none();
     ExtMove *                    cur, *endCur, *endBadCaptures, *endBadMoves;
     Stages                       stage;
     Stages                       first_stage;

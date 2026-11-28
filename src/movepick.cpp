@@ -18,6 +18,7 @@
 
 #include "movepick.h"
 
+#include <algorithm>
 #include <cassert>
 #include <limits>
 
@@ -281,6 +282,20 @@ Move MovePicker::select(Pred filter) {
     return Move::none();
 }
 
+void MovePicker::prefer(Move move) {
+    assert(stage == INIT_FIRST_STAGE && first_stage == GOOD_CAPTURE);
+    assert(move.is_ok() && move != ttMove && pos.legal(move));
+    preferredMove = move;
+}
+
+// Keep scores and the relative order of all other moves intact.
+void MovePicker::promote_preferred() {
+    auto* it = std::find(cur, endCur, preferredMove);
+    if (it != endCur)
+        std::rotate(cur, it, it + 1);
+    preferredMove = Move::none();
+}
+
 // This is the most important method of the MovePicker class. We emit one
 // new legal move on every call until there are no more moves left,
 // picking the move with the highest score from a list of generated moves.
@@ -305,6 +320,9 @@ dispatch:
 
         partial_insertion_sort(cur, endCur, std::numeric_limits<int>::min());
 
+        if (preferredMove && pos.capture_stage(preferredMove))
+            promote_preferred();
+
         stage = first_stage;
         goto dispatch;
 
@@ -326,6 +344,9 @@ dispatch:
             endCur = generate_and_score<QUIETS>();
 
             partial_insertion_sort(cur, endCur, -3560 * depth);
+
+            if (preferredMove)
+                promote_preferred();
 
             stage = GOOD_QUIET;
             [[fallthrough]];

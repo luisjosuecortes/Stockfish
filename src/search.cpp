@@ -1268,8 +1268,16 @@ moves_loop:  // When in check, search starts here
             Depth singularDepth = newDepth / 2;
 
             ss->excludedMove = move;
+            ss->singularWitness = Move::none();
             value = search<NonPV>(pos, ss, singularBeta - 1, singularBeta, singularDepth, cutNode);
             ss->excludedMove = Move::none();
+            Move witness = ss->singularWitness;
+
+            // Reuse a witnessed alternative without changing its native move-picking stage.
+            if (!ss->inCheck && witness.is_ok() && witness != move && value >= singularBeta
+                && value < beta && !is_decisive(value)
+                && !threads.stop.load(std::memory_order_relaxed))
+                mp.prefer(witness);
 
             if (value < singularBeta)
             {
@@ -1550,6 +1558,8 @@ moves_loop:  // When in check, search starts here
                 {
                     // (*Scaler) Infrequent and small updates scale well
                     ss->cutoffCnt += (extension < 2) || PvNode;
+                    if (excludedMove)
+                        ss->singularWitness = move;
                     assert(value >= beta);  // Fail high
                     break;
                 }
